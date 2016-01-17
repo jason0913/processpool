@@ -2,7 +2,7 @@
 * @Author: jql
 * @Date:   2016-01-15 02:53:17
 * @Last Modified by:   jql
-* @Last Modified time: 2016-01-16 07:42:52
+* @Last Modified time: 2016-01-16 22:21:50
 */
 
 #include <stdio.h>
@@ -49,7 +49,7 @@ void do_service(int listenfd,socklen_t addrlen,int pipe)
 	int res;
 
 	char buf[256];
-	char cmd[16];
+	char cmd[32];
 	char opt_file[128];
 
 	memset(buf,0,sizeof(buf));
@@ -67,7 +67,7 @@ void do_service(int listenfd,socklen_t addrlen,int pipe)
 			continue;
 		}
 #ifdef __DEBUG__
-		printf("child %d read message from parent:%s\n", getpid(),buf);
+		printf("child %d  recv mess from pipe :%s\n", getpid(),buf);
 #endif
 		clilen = addrlen;
 		connfd = accept(listenfd,cliaddr,&clilen);
@@ -79,8 +79,74 @@ void do_service(int listenfd,socklen_t addrlen,int pipe)
 #endif
 		split_client_message(buf,cmd,opt_file);
 
+#ifdef __DEBUG__
 		printf("%s\n", cmd);
 		printf("%s\n", opt_file);
+#endif
+		if (0 == strcmp(cmd,"fdfs_upload_file"))
+		{
+			close(1);
+			dup(connfd);
+			close(connfd);
+			// printf("fdfs_upload_file\n");
+			if (execl("./fdfs_upload_file","fdfs_upload_file","/etc/fdfs/client.conf",opt_file,NULL) <0)
+			{
+				logErrorEx(PROCESSPOOL_ERROR_LOG_FILENAME,"file: "__FILE__",line:%d,"\
+					"errno info:%s",__LINE__,strerror(errno));
+				return ;
+			}
+			memset(buf,0,sizeof(buf));
+			sprintf(buf,"%s,pid=%d","child_done",getpid());
+			write(pipe,buf,sizeof(buf));
+
+		}
+		else if (0 == strcmp(cmd,"fdfs_download_file"))
+		{
+			close(1);
+			dup(connfd);
+			close(connfd);
+			if (execl("./fdfs_download_file","fdfs_download_file","/etc/fdfs/client.conf",opt_file,NULL) <0)
+			{
+				logErrorEx(PROCESSPOOL_ERROR_LOG_FILENAME,"file: "__FILE__",line:%d,"\
+					"errno info:%s",__LINE__,strerror(errno));
+				return ;
+			}
+			memset(buf,0,sizeof(buf));
+			sprintf(buf,"%s,pid=%d","child_done",getpid());
+			write(pipe,buf,sizeof(buf));
+		}
+		else if (0 == strcmp(cmd,"fdfs_delete_file"))
+		{
+
+			if (execl("./fdfs_delete_file","fdfs_delete_file","/etc/fdfs/client.conf",opt_file,NULL) <0)
+			{
+				logErrorEx(PROCESSPOOL_ERROR_LOG_FILENAME,"file: "__FILE__",line:%d,"\
+					"errno info:%s",__LINE__,strerror(errno));
+				return ;
+			}
+			memset(buf,0,sizeof(buf));
+			sprintf(buf,"%s,pid=%d","child_done",getpid());
+			write(pipe,buf,sizeof(buf));
+		}
+		else if (0 == strcmp(cmd,"fdfs_file_info"))
+		{
+			close(1);
+			dup(connfd);
+			close(connfd);
+			if (execl("./fdfs_file_info","fdfs_file_info","/etc/fdfs/client.conf",opt_file,NULL) <0)
+			{
+				logErrorEx(PROCESSPOOL_ERROR_LOG_FILENAME,"file: "__FILE__",line:%d,"\
+					"errno info:%s",__LINE__,strerror(errno));
+				return ;
+			}
+			memset(buf,0,sizeof(buf));
+			sprintf(buf,"%s,pid=%d","child_done",getpid());
+			write(pipe,buf,sizeof(buf));
+		}
+		else
+		{
+
+		}
 		close(connfd);
 	}
 }
